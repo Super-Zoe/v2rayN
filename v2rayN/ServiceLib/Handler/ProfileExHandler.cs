@@ -14,23 +14,22 @@ namespace ServiceLib.Handler
 
         public ProfileExHandler()
         {
-            Init();
-
             Task.Run(async () =>
             {
+                await Init();
                 while (true)
                 {
-                    SaveQueueIndexIds();
+                    await SaveQueueIndexIds();
                     await Task.Delay(1000 * 600);
                 }
             });
         }
 
-        private void Init()
+        private async Task Init()
         {
-            SQLiteHelper.Instance.Execute($"delete from ProfileExItem where indexId not in ( select indexId from ProfileItem )");
+            await SQLiteHelper.Instance.ExecuteAsync($"delete from ProfileExItem where indexId not in ( select indexId from ProfileItem )");
 
-            _lstProfileEx = new(SQLiteHelper.Instance.Table<ProfileExItem>());
+            _lstProfileEx = new(await SQLiteHelper.Instance.TableAsync<ProfileExItem>().ToListAsync());
         }
 
         private void IndexIdEnqueue(string indexId)
@@ -41,12 +40,12 @@ namespace ServiceLib.Handler
             }
         }
 
-        private void SaveQueueIndexIds()
+        private async Task SaveQueueIndexIds()
         {
             var cnt = _queIndexIds.Count;
             if (cnt > 0)
             {
-                var lstExists = SQLiteHelper.Instance.Table<ProfileExItem>();
+                var lstExists = await SQLiteHelper.Instance.TableAsync<ProfileExItem>().ToListAsync();
                 List<ProfileExItem> lstInserts = [];
                 List<ProfileExItem> lstUpdates = [];
 
@@ -72,10 +71,10 @@ namespace ServiceLib.Handler
                 try
                 {
                     if (lstInserts.Count() > 0)
-                        SQLiteHelper.Instance.InsertAll(lstInserts);
+                        await SQLiteHelper.Instance.InsertAllAsync(lstInserts);
 
                     if (lstUpdates.Count() > 0)
-                        SQLiteHelper.Instance.UpdateAll(lstUpdates);
+                        await SQLiteHelper.Instance.UpdateAllAsync(lstUpdates);
                 }
                 catch (Exception ex)
                 {
@@ -97,17 +96,17 @@ namespace ServiceLib.Handler
             IndexIdEnqueue(indexId);
         }
 
-        public void ClearAll()
+        public async Task ClearAll()
         {
-            SQLiteHelper.Instance.Execute($"delete from ProfileExItem ");
+            await SQLiteHelper.Instance.ExecuteAsync($"delete from ProfileExItem ");
             _lstProfileEx = new();
         }
 
-        public void SaveTo()
+        public async Task SaveTo()
         {
             try
             {
-                SaveQueueIndexIds();
+                await SaveQueueIndexIds();
             }
             catch (Exception ex)
             {

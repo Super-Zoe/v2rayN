@@ -88,7 +88,7 @@ namespace ServiceLib.Services
             UpdateFunc("", ResUI.SpeedtestingStop);
         }
 
-        private Task RunTcping()
+        private async Task RunTcping()
         {
             try
             {
@@ -123,24 +123,22 @@ namespace ServiceLib.Services
             }
             finally
             {
-                ProfileExHandler.Instance.SaveTo();
+                await ProfileExHandler.Instance.SaveTo();
             }
-
-            return Task.CompletedTask;
         }
 
-        private Task RunRealPing()
+        private async Task RunRealPing()
         {
             int pid = -1;
             try
             {
                 string msg = string.Empty;
 
-                pid = CoreHandler.Instance.LoadCoreConfigSpeedtest(_selecteds);
+                pid = await CoreHandler.Instance.LoadCoreConfigSpeedtest(_selecteds);
                 if (pid < 0)
                 {
                     UpdateFunc("", ResUI.FailedToRunCore);
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 DownloadService downloadHandle = new DownloadService();
@@ -186,10 +184,8 @@ namespace ServiceLib.Services
                 {
                     CoreHandler.Instance.CoreStopPid(pid);
                 }
-                ProfileExHandler.Instance.SaveTo();
+                await ProfileExHandler.Instance.SaveTo();
             }
-
-            return Task.CompletedTask;
         }
 
         private async Task RunSpeedTestAsync()
@@ -200,7 +196,7 @@ namespace ServiceLib.Services
             //    _selecteds = _selecteds.OrderBy(t => t.delay).ToList();
             //}
 
-            pid = CoreHandler.Instance.LoadCoreConfigSpeedtest(_selecteds);
+            pid = await CoreHandler.Instance.LoadCoreConfigSpeedtest(_selecteds);
             if (pid < 0)
             {
                 UpdateFunc("", ResUI.FailedToRunCore);
@@ -235,7 +231,7 @@ namespace ServiceLib.Services
                 ProfileExHandler.Instance.SetTestSpeed(it.IndexId, "-1");
                 UpdateFunc(it.IndexId, "", ResUI.Speedtesting);
 
-                var item = AppHandler.Instance.GetProfileItem(it.IndexId);
+                var item = await AppHandler.Instance.GetProfileItem(it.IndexId);
                 if (item is null) continue;
 
                 WebProxy webProxy = new(Global.Loopback, it.Port);
@@ -256,13 +252,13 @@ namespace ServiceLib.Services
                 CoreHandler.Instance.CoreStopPid(pid);
             }
             UpdateFunc("", ResUI.SpeedtestingCompleted);
-            ProfileExHandler.Instance.SaveTo();
+            await ProfileExHandler.Instance.SaveTo();
         }
 
         private async Task RunSpeedTestMulti()
         {
             int pid = -1;
-            pid = CoreHandler.Instance.LoadCoreConfigSpeedtest(_selecteds);
+            pid = await CoreHandler.Instance.LoadCoreConfigSpeedtest(_selecteds);
             if (pid < 0)
             {
                 UpdateFunc("", ResUI.FailedToRunCore);
@@ -298,7 +294,7 @@ namespace ServiceLib.Services
                 ProfileExHandler.Instance.SetTestSpeed(it.IndexId, "-1");
                 UpdateFunc(it.IndexId, "", ResUI.Speedtesting);
 
-                var item = AppHandler.Instance.GetProfileItem(it.IndexId);
+                var item = await AppHandler.Instance.GetProfileItem(it.IndexId);
                 if (item is null) continue;
 
                 WebProxy webProxy = new(Global.Loopback, it.Port);
@@ -321,7 +317,7 @@ namespace ServiceLib.Services
                 CoreHandler.Instance.CoreStopPid(pid);
             }
             UpdateFunc("", ResUI.SpeedtestingCompleted);
-            ProfileExHandler.Instance.SaveTo();
+            await ProfileExHandler.Instance.SaveTo();
         }
 
         private async Task RunMixedtestAsync()

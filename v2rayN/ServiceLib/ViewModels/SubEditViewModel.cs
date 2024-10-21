@@ -14,34 +14,26 @@ namespace ServiceLib.ViewModels
         public SubEditViewModel(SubItem subItem, Func<EViewAction, object?, Task<bool>>? updateView)
         {
             _config = AppHandler.Instance.Config;
-
             _updateView = updateView;
-
-            if (subItem.id.IsNullOrEmpty())
-            {
-                SelectedSource = subItem;
-            }
-            else
-            {
-                SelectedSource = JsonUtils.DeepCopy(subItem);
-            }
 
             SaveCmd = ReactiveCommand.CreateFromTask(async () =>
             {
                 await SaveSubAsync();
             });
+
+            SelectedSource = subItem.id.IsNullOrEmpty() ? subItem : JsonUtils.DeepCopy(subItem);
         }
 
         private async Task SaveSubAsync()
         {
-            string remarks = SelectedSource.remarks;
+            var remarks = SelectedSource.remarks;
             if (Utils.IsNullOrEmpty(remarks))
             {
                 NoticeHandler.Instance.Enqueue(ResUI.PleaseFillRemarks);
                 return;
             }
 
-            if (ConfigHandler.AddSubItem(_config, SelectedSource) == 0)
+            if (await ConfigHandler.AddSubItem(_config, SelectedSource) == 0)
             {
                 NoticeHandler.Instance.Enqueue(ResUI.OperationSuccess);
                 _updateView?.Invoke(EViewAction.CloseWindow, null);

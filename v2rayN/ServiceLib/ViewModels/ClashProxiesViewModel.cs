@@ -46,33 +46,6 @@ namespace ServiceLib.ViewModels
             _config = AppHandler.Instance.Config;
             _updateView = updateView;
 
-            SelectedGroup = new();
-            SelectedDetail = new();
-
-            AutoRefresh = _config.clashUIItem.proxiesAutoRefresh;
-            SortingSelected = _config.clashUIItem.proxiesSorting;
-            RuleModeSelected = (int)_config.clashUIItem.ruleMode;
-
-            this.WhenAnyValue(
-               x => x.SelectedGroup,
-               y => y != null && Utils.IsNotEmpty(y.name))
-                   .Subscribe(c => RefreshProxyDetails(c));
-
-            this.WhenAnyValue(
-               x => x.RuleModeSelected,
-               y => y >= 0)
-                   .Subscribe(c => DoRulemodeSelected(c));
-
-            this.WhenAnyValue(
-               x => x.SortingSelected,
-               y => y >= 0)
-                  .Subscribe(c => DoSortingSelected(c));
-
-            this.WhenAnyValue(
-            x => x.AutoRefresh,
-            y => y == true)
-                .Subscribe(c => { _config.clashUIItem.proxiesAutoRefresh = AutoRefresh; });
-
             ProxiesReloadCmd = ReactiveCommand.CreateFromTask(async () =>
             {
                 await ProxiesReload();
@@ -91,11 +64,42 @@ namespace ServiceLib.ViewModels
                 await SetActiveProxy();
             });
 
-            ProxiesReload();
-            DelayTestTask();
+            SelectedGroup = new();
+            SelectedDetail = new();
+            AutoRefresh = _config.clashUIItem.proxiesAutoRefresh;
+            SortingSelected = _config.clashUIItem.proxiesSorting;
+            RuleModeSelected = (int)_config.clashUIItem.ruleMode;
+
+            this.WhenAnyValue(
+               x => x.SelectedGroup,
+               y => y != null && Utils.IsNotEmpty(y.name))
+                   .Subscribe(c => RefreshProxyDetails(c));
+
+            this.WhenAnyValue(
+               x => x.RuleModeSelected,
+               y => y >= 0)
+                   .Subscribe(async c => await DoRulemodeSelected(c));
+
+            this.WhenAnyValue(
+               x => x.SortingSelected,
+               y => y >= 0)
+                  .Subscribe(c => DoSortingSelected(c));
+
+            this.WhenAnyValue(
+            x => x.AutoRefresh,
+            y => y == true)
+                .Subscribe(c => { _config.clashUIItem.proxiesAutoRefresh = AutoRefresh; });
+
+            Init();
         }
 
-        private void DoRulemodeSelected(bool c)
+        private async Task Init()
+        {
+            await ProxiesReload();
+            await DelayTestTask();
+        }
+
+        private async Task DoRulemodeSelected(bool c)
         {
             if (!c)
             {
@@ -105,16 +109,16 @@ namespace ServiceLib.ViewModels
             {
                 return;
             }
-            SetRuleModeCheck((ERuleMode)RuleModeSelected);
+            await SetRuleModeCheck((ERuleMode)RuleModeSelected);
         }
 
-        public void SetRuleModeCheck(ERuleMode mode)
+        public async Task SetRuleModeCheck(ERuleMode mode)
         {
             if (_config.clashUIItem.ruleMode == mode)
             {
                 return;
             }
-            SetRuleMode(mode);
+            await SetRuleMode(mode);
         }
 
         private void DoSortingSelected(bool c)
@@ -138,18 +142,18 @@ namespace ServiceLib.ViewModels
 
         public async Task ProxiesReload()
         {
-            GetClashProxies(true);
-            ProxiesDelayTest();
+            await GetClashProxies(true);
+            await ProxiesDelayTest();
         }
 
         public async Task ProxiesDelayTest()
         {
-            ProxiesDelayTest(true);
+            await ProxiesDelayTest(true);
         }
 
         #region proxy function
 
-        private void SetRuleMode(ERuleMode mode)
+        private async Task SetRuleMode(ERuleMode mode)
         {
             _config.clashUIItem.ruleMode = mode;
 
@@ -159,27 +163,24 @@ namespace ServiceLib.ViewModels
                 {
                     { "mode", mode.ToString().ToLower() }
                 };
-                ClashApiHandler.Instance.ClashConfigUpdate(headers);
+                await ClashApiHandler.Instance.ClashConfigUpdate(headers);
             }
         }
 
-        private void GetClashProxies(bool refreshUI)
+        private async Task GetClashProxies(bool refreshUI)
         {
-            ClashApiHandler.Instance.GetClashProxies(_config, async (it, it2) =>
+            var ret = await ClashApiHandler.Instance.GetClashProxiesAsync(_config);
+            if (ret?.Item1 == null || ret.Item2 == null)
             {
-                //UpdateHandler(false, "Refresh Clash Proxies");
-                _proxies = it?.proxies;
-                _providers = it2?.providers;
+                return;
+            }
+            _proxies = ret.Item1.proxies;
+            _providers = ret?.Item2.providers;
 
-                if (_proxies == null)
-                {
-                    return;
-                }
-                if (refreshUI)
-                {
-                    _updateView?.Invoke(EViewAction.DispatcherRefreshProxyGroups, null);
-                }
-            });
+            if (refreshUI)
+            {
+                _updateView?.Invoke(EViewAction.DispatcherRefreshProxyGroups, null);
+            }
         }
 
         public void RefreshProxyGroups()
@@ -365,7 +366,7 @@ namespace ServiceLib.ViewModels
                 return;
             }
 
-            ClashApiHandler.Instance.ClashSetActiveProxy(name, nameNode);
+            await ClashApiHandler.Instance.ClashSetActiveProxy(name, nameNode);
 
             selectedProxy.now = nameNode;
             var group = _proxyGroups.Where(it => it.name == SelectedGroup.name).FirstOrDefault();
@@ -388,7 +389,7 @@ namespace ServiceLib.ViewModels
             {
                 if (item == null)
                 {
-                    GetClashProxies(true);
+                    await GetClashProxies(true);
                     return;
                 }
                 if (Utils.IsNullOrEmpty(result))
@@ -420,7 +421,7 @@ namespace ServiceLib.ViewModels
                 else
                 {
                     detail.delay = _delayTimeout;
-                    detail.delayName = String.Empty;
+                    detail.delayName = string.Empty;
                 }
                 _proxyDetails.Replace(detail, JsonUtils.DeepCopy(detail));
             }
@@ -430,12 +431,12 @@ namespace ServiceLib.ViewModels
 
         #region task
 
-        public void DelayTestTask()
+        public async Task DelayTestTask()
         {
             var lastTime = DateTime.Now;
 
             Observable.Interval(TimeSpan.FromSeconds(60))
-              .Subscribe(x =>
+              .Subscribe(async x =>
               {
                   if (!(AutoRefresh && _config.uiItem.showInTaskbar && _config.IsRunningCore(ECoreType.sing_box)))
                   {
@@ -446,7 +447,7 @@ namespace ServiceLib.ViewModels
                   {
                       if ((dtNow - lastTime).Minutes % _config.clashUIItem.proxiesAutoDelayTestInterval == 0)
                       {
-                          ProxiesDelayTest();
+                          await ProxiesDelayTest();
                           lastTime = dtNow;
                       }
                       Task.Delay(1000).Wait();

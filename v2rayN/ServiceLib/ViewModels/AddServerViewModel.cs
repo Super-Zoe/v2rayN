@@ -17,8 +17,12 @@ namespace ServiceLib.ViewModels
         public AddServerViewModel(ProfileItem profileItem, Func<EViewAction, object?, Task<bool>>? updateView)
         {
             _config = AppHandler.Instance.Config;
-
             _updateView = updateView;
+
+            SaveCmd = ReactiveCommand.CreateFromTask(async () =>
+            {
+                await SaveServerAsync();
+            });
 
             if (profileItem.indexId.IsNullOrEmpty())
             {
@@ -33,11 +37,6 @@ namespace ServiceLib.ViewModels
                 SelectedSource = JsonUtils.DeepCopy(profileItem);
             }
             CoreType = SelectedSource?.coreType?.ToString();
-
-            SaveCmd = ReactiveCommand.CreateFromTask(async () =>
-            {
-                await SaveServerAsync();
-            });
         }
 
         private async Task SaveServerAsync()
@@ -84,7 +83,7 @@ namespace ServiceLib.ViewModels
             }
             SelectedSource.coreType = CoreType.IsNullOrEmpty() ? null : (ECoreType)Enum.Parse(typeof(ECoreType), CoreType);
 
-            if (ConfigHandler.AddServer(_config, SelectedSource) == 0)
+            if (await ConfigHandler.AddServer(_config, SelectedSource) == 0)
             {
                 NoticeHandler.Instance.Enqueue(ResUI.OperationSuccess);
                 _updateView?.Invoke(EViewAction.CloseWindow, null);

@@ -24,21 +24,21 @@
             while (true)
             {
                 var updateTime = ((DateTimeOffset)DateTime.Now).ToUnixTimeSeconds();
-                var lstSubs = AppHandler.Instance.SubItems()
+                var lstSubs = (await AppHandler.Instance.SubItems())
                             .Where(t => t.autoUpdateInterval > 0)
                             .Where(t => updateTime - t.updateTime >= t.autoUpdateInterval * 60)
                             .ToList();
 
                 foreach (var item in lstSubs)
                 {
-                    updateHandle.UpdateSubscriptionProcess(config, item.id, true, (bool success, string msg) =>
-                    {
-                        updateFunc?.Invoke(success, msg);
-                        if (success)
-                            Logging.SaveLog("subscription" + msg);
-                    });
+                    await updateHandle.UpdateSubscriptionProcess(config, item.id, true, (bool success, string msg) =>
+                        {
+                            updateFunc?.Invoke(success, msg);
+                            if (success)
+                                Logging.SaveLog("subscription" + msg);
+                        });
                     item.updateTime = updateTime;
-                    ConfigHandler.AddSubItem(config, item);
+                    await ConfigHandler.AddSubItem(config, item);
 
                     await Task.Delay(5000);
                 }
